@@ -1,10 +1,14 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 
 namespace ExpressionTrees.Task1.ExpressionsTransformer
 {
     public class IncDecExpressionVisitor : ExpressionVisitor
     {
+        private Dictionary<string, ConstantExpression> _constantExpressions = new Dictionary<string, ConstantExpression>();
+
         protected override Expression VisitBinary(BinaryExpression node)
         {
             Expression resultExpression = null;
@@ -19,8 +23,23 @@ namespace ExpressionTrees.Task1.ExpressionsTransformer
                     TryConvertBinaryExpression(node, ExpressionConvertTypes.Decrement, out resultExpression);
                     break;
             }
-            
+
             return resultExpression ?? base.VisitBinary(node);
+        }
+
+        public Expression VisitLambdaModified<T>(Expression<T> node, Dictionary<string, object> parameters)
+        {
+            _constantExpressions = parameters
+                .ToDictionary(x => x.Key, x => Expression.Constant(x.Value));
+
+            return Expression.Lambda(Visit(node.Body), node.Parameters);
+        }
+
+        protected override Expression VisitParameter(ParameterExpression node)
+        {
+            return _constantExpressions.TryGetValue(node.Name, out var constantExpression)
+                ? (Expression)constantExpression
+                : node;
         }
 
         private bool TryConvertBinaryExpression(BinaryExpression expression, ExpressionConvertTypes convertType, out Expression resultExpression)
